@@ -1,0 +1,129 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: weaviate-init-config
+  namespace: weaviate
+data:
+  init-schema.json: |
+    {
+      "classes": [
+        {
+          "class": "Document",
+          "vectorIndexType": "hnsw",
+          "vectorIndexConfig": {
+            "skip": false,
+            "cleanupIntervalSeconds": 300,
+            "maxConnections": 64,
+            "efConstruction": 128,
+            "ef": 128,
+            "flatSearchCutoff": 40000,
+            "distance": "cosine"
+          },
+          "properties": [
+            {
+              "name": "content",
+              "dataType": ["text"],
+              "indexInverted": true
+            },
+            {
+              "name": "source",
+              "dataType": ["string"],
+              "indexInverted": true
+            },
+            {
+              "name": "metadata",
+              "dataType": ["object"],
+              "indexInverted": false
+            },
+            {
+              "name": "timestamp",
+              "dataType": ["date"],
+              "indexInverted": true
+            }
+          ]
+        }
+      ]
+    }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: weaviate-init-schema
+  namespace: weaviate
+spec:
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      serviceAccountName: weaviate-sa
+      restartPolicy: Never
+      containers:
+      - name: schema-loader
+        image: curlimages/curl:latest
+        env:
+        - name: WEAVIATE_HOST
+          value: "weaviate-weaviate.weaviate.svc.cluster.local"
+        - name: WEAVIATE_PORT
+          value: "8080"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Wait for Weaviate to be ready
+          for i in {1..30}; do
+            if curl -s http://$WEAVIATE_HOST:$WEAVIATE_PORT/v1/.well-known/ready > /dev/null; then
+              echo "Weaviate is ready"
+              break
+            fi
+            echo "Waiting for Weaviate... ($i/30)"
+            sleep 2
+          done
+          
+          # Check if Document class already exists
+          CLASSES=$(curl -s http://$WEAVIATE_HOST:$WEAVIATE_PORT/v1/schema | grep -c '"class": "Document"' || echo "0")
+          
+          if [ "$CLASSES" -eq "0" ]; then
+            echo "Creating Document class..."
+            cat << 'EOF' | curl -X POST \
+              -H "Content-Type: application/json" \
+              -d @- \
+              http://$WEAVIATE_HOST:$WEAVIATE_PORT/v1/schema/classes
+          {
+            "class": "Document",
+            "vectorIndexType": "hnsw",
+            "vectorIndexConfig": {
+              "skip": false,
+              "cleanupIntervalSeconds": 300,
+              "maxConnections": 64,
+              "efConstruction": 128,
+              "ef": 128,
+              "flatSearchCutoff": 40000,
+              "distance": "cosine"
+            },
+            "properties": [
+              {
+                "name": "content",
+                "dataType": ["text"],
+                "indexInverted": true
+              },
+              {
+                "name": "source",
+                "dataType": ["string"],
+                "indexInverted": true
+              },
+              {
+                "name": "metadata",
+                "dataType": ["object"],
+                "indexInverted": false
+              },
+              {
+                "name": "timestamp",
+                "dataType": ["date"],
+                "indexInverted": true
+              }
+            ]
+          }
+          EOF
+            echo "Document class created"
+          else
+            echo "Document class already exists"
+          fi
