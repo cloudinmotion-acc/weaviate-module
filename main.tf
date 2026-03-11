@@ -1,5 +1,18 @@
+# Explicit dependency on all upstream modules
+# This ensures weaviate module waits for INFRASTRUCTURE, EKS, and bastion modules to complete
+resource "null_resource" "module_depends_on" {
+  triggers = {
+    cluster_name                = local.cluster_name
+    cluster_endpoint            = local.cluster_endpoint
+    oidc_provider_arn           = local.oidc_provider_arn
+    vpc_id                      = local.vpc_id
+    region                      = local.region
+    bastion_ip                  = var.bastion_host_output["public_ip"]
+  }
+}
+
 # Create Kubernetes namespace
-resource "kubernetes_namespace" "weaviate" {
+resource "kubernetes_namespace_v1" "weaviate" {
   metadata {
     name = var.namespace
     labels = {
@@ -7,22 +20,27 @@ resource "kubernetes_namespace" "weaviate" {
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
+
+  depends_on = [null_resource.module_depends_on]
 }
 
 # Create ServiceAccount for Weaviate
-resource "kubernetes_service_account" "weaviate" {
+resource "kubernetes_service_account_v1" "weaviate" {
   metadata {
     name      = local.service_account_name
-    namespace = kubernetes_namespace.weaviate.metadata[0].name
+    namespace = kubernetes_namespace_v1.weaviate.metadata[0].name
     labels = merge(
-      local.common_tags,
+      local.kubernetes_labels,
       {
         "app.kubernetes.io/component" = "weaviate"
       }
     )
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.weaviate_irsa.arn
+    }
   }
 
-  depends_on = [kubernetes_namespace.weaviate]
+  depends_on = [kubernetes_namespace_v1.weaviate, aws_iam_role.weaviate_irsa]
 }
 
 # Create IAM role for Weaviate (IRSA)
@@ -36,12 +54,12 @@ resource "aws_iam_role" "weaviate_irsa" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Effect = "Allow"
         Principal = {
-          Federated = data.aws_eks_cluster.this.identity[0].oidc[0].issuer
+          Federated = local.oidc_provider_arn
         }
         Condition = {
           StringEquals = {
-            "${replace(data.aws_eks_cluster.this.identity[0].oidc[0].issuer, "https://", "")}:sub" = "system:serviceaccount:${kubernetes_namespace.weaviate.metadata[0].name}:${local.service_account_name}"
-            "${replace(data.aws_eks_cluster.this.identity[0].oidc[0].issuer, "https://", "")}:aud" = "sts.amazonaws.com"
+            "${replace(local.oidc_provider_url, "https://", "")}:sub" = "system:serviceaccount:${kubernetes_namespace_v1.weaviate.metadata[0].name}:${local.service_account_name}"
+            "${replace(local.oidc_provider_url, "https://", "")}:aud" = "sts.amazonaws.com"
           }
         }
       }
@@ -72,18 +90,7 @@ resource "aws_iam_role_policy" "weaviate_kms" {
   policy      = data.aws_iam_policy_document.weaviate_kms.json
 }
 
-# Annotate ServiceAccount with IAM role
-resource "kubernetes_service_account_v1_patch" "weaviate_irsa" {
-  metadata {
-    name      = kubernetes_service_account.weaviate.metadata[0].name
-    namespace = kubernetes_service_account.weaviate.metadata[0].namespace
-    annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.weaviate_irsa.arn
-    }
-  }
-
-  depends_on = [kubernetes_service_account.weaviate]
-}
+# ServiceAccount IRSA annotation is now handled in the service account resource above
 
 # S3 bucket for backups
 resource "aws_s3_bucket" "weaviate_backups" {
@@ -129,10 +136,9 @@ resource "aws_s3_bucket_public_access_block" "weaviate_backups" {
 
 # Secrets Manager secret for API key
 resource "random_password" "weaviate_api_key" {
-  count       = var.create_api_key ? 1 : 0
-  length      = 32
-  special     = true
-  prefer_special_chars = false
+  count            = var.create_api_key ? 1 : 0
+  length           = 32
+  special          = true
   override_special = "!&#$^<>-"
 }
 
@@ -159,7 +165,7 @@ resource "helm_release" "weaviate" {
   repository       = var.helm_repository
   chart            = "weaviate"
   version          = var.helm_chart_version
-  namespace        = kubernetes_namespace.weaviate.metadata[0].name
+  namespace        = kubernetes_namespace_v1.weaviate.metadata[0].name
   create_namespace = false
 
   values = [
@@ -167,7 +173,7 @@ resource "helm_release" "weaviate" {
       local.default_helm_values,
       {
         serviceAccount = {
-          name   = kubernetes_service_account.weaviate.metadata[0].name
+          name   = kubernetes_service_account_v1.weaviate.metadata[0].name
           create = false
         }
         image = {
@@ -180,23 +186,8 @@ resource "helm_release" "weaviate" {
     ))
   ]
 
-  set {
-    name  = "persistence.enabled"
-    value = "true"
-  }
-
-  set {
-    name  = "persistence.storageClassName"
-    value = var.storage_class
-  }
-
-  set {
-    name  = "persistence.size"
-    value = var.storage_size
-  }
-
   depends_on = [
-    kubernetes_service_account_v1_patch.weaviate_irsa,
+    kubernetes_service_account_v1.weaviate,
     aws_iam_role_policy.weaviate_s3_backups,
     aws_iam_role_policy.weaviate_secrets,
     aws_iam_role_policy.weaviate_kms
@@ -211,9 +202,14 @@ resource "helm_release" "weaviate" {
 
 # Destroy provisioner to clean up on destroy
 resource "null_resource" "helm_cleanup" {
+  triggers = {
+    helm_release_name = var.helm_release_name
+    namespace         = var.namespace
+  }
+
   provisioner "local-exec" {
     when    = destroy
-    command = "helm uninstall ${var.helm_release_name} -n ${var.namespace} --ignore-not-found 2>/dev/null || true"
+    command = "helm uninstall ${self.triggers.helm_release_name} -n ${self.triggers.namespace} --ignore-not-found 2>/dev/null || true"
     on_failure = continue
   }
 

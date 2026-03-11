@@ -1,5 +1,3 @@
-# -> it seems you did not make use of our modules like init, bastion and eks all of these are provisioned you will get the terraform output values 
-
 # Weaviate EKS Terraform Module (terraform-aws-weaviate-eks)
 
 ## Overview
@@ -46,7 +44,6 @@ export KUBECONFIG=~/.kube/config
 ### 1. Initialize Terraform
 
 ```bash
-cd ~/pgvector/weaviate
 terraform init
 ```
 
@@ -54,14 +51,6 @@ terraform init
 
 Edit `terraform.tfvars` with your EKS cluster details:
 
-```hcl
-cluster_name    = "your-eks-cluster-name"      # e.g., "testdb09-eks"
-cluster_region  = "us-east-1"                  # AWS region
-environment     = "dev"                        # dev, test, staging, prod
-vector_dimensions = 1536                       # OpenAI compatible
-weaviate_replicas = 3                          # HA: 3 replicas
-storage_size    = "50Gi"                       # Persistent volume size
-```
 
 ### 3. Validate & Deploy
 

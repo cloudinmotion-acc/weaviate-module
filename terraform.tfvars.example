@@ -1,31 +1,62 @@
 # Weaviate Module - Configuration Template
 # Copy this file to terraform.tfvars and update with your values
 
-cluster_name           = "your-eks-cluster-name"
-cluster_region         = "us-east-1"
-namespace              = "weaviate"
-weaviate_replicas      = 3
-vector_dimensions      = 1536
-storage_size           = "50Gi"
-storage_class          = "gp3"
-weaviate_image         = "semitechnologies/weaviate:1.25.1"
-helm_release_name      = "weaviate"
-create_api_key         = true
-api_key_recovery_window = 7
-enable_s3_backups      = true
-backup_retention_days  = 7
-environment            = "dev"
-project_name           = "myplatform"
-
-helm_values_override = {
-  # replicaCount = 5
-  # resources = {
-  #   limits = {
-  #     memory = "8Gi"
-  #     cpu    = "4000m"
-  #   }
-  # }
+# Module outputs from dependent modules
+platform_output = {
+  name             = "your-platform-name"
+  owner            = "your-email@company.com"
+  environment_type = "dev"
+  system_name      = "your-system-name"
+  tags = {
+    key = "value"
+  }
 }
+
+initialization_output = {
+  vpc_id               = "vpc-xxxxx"
+  region               = "us-east-1"
+  kms_key_arn          = "arn:aws:kms:us-east-1:account-id:key/key-id"
+  private_subnets     = ["subnet-xxxxx", "subnet-xxxxx", "subnet-xxxxx"]
+  public_subnets      = ["subnet-xxxxx", "subnet-xxxxx", "subnet-xxxxx"]
+  ssh_key_name        = "your-key-pair"
+  db_subnet_group     = "your-db-subnet-group"
+  dns_private_zone_id = "zone-id"
+}
+
+bastion_host_output = {
+  bastion_host_user = "rhel"
+  private_ip        = "10.x.x.x"
+  public_ip         = "x.x.x.x"
+  public_dns        = "ec2-x-x-x-x.compute-1.amazonaws.com"
+  security_group_id = "sg-xxxxx"
+  role_arn          = "arn:aws:iam::account-id:role/bastion-role"
+  role_name         = "bastion-role"
+}
+
+kubernetes_cluster_output = {
+  cluster_name                    = "your-eks-cluster"
+  cluster_id                      = "your-eks-cluster"
+  cluster_arn                     = "arn:aws:eks:us-east-1:account-id:cluster/your-eks-cluster"
+  cluster_endpoint                = "https://xxxxx.eks.us-east-1.amazonaws.com"
+  cluster_certificate_data        = "LS0tLS1CRUdJTi... (base64 cert)"
+  cluster_iam_role_arn            = "arn:aws:iam::account-id:role/eks-cluster-role"
+  aws_iam_openid_connect_provider = "arn:aws:iam::account-id:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/xxxxx"
+  aws_iam_openid_url              = "https://oidc.eks.us-east-1.amazonaws.com/id/xxxxx"
+}
+
+namespace               = "weaviate"
+weaviate_replicas       = 3
+vector_dimensions       = 1536
+storage_size            = "50Gi"
+storage_type            = "local"
+storage_class           = "gp3"
+weaviate_image          = "semitechnologies/weaviate:1.25.1"
+helm_release_name       = "weaviate"
+create_api_key          = true
+api_key_recovery_window = 7
+force_delete_secrets_on_destroy = true
+enable_s3_backups       = true
+backup_retention_days   = 7
 
 tags = {
   Owner       = "your-team"

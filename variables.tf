@@ -1,16 +1,35 @@
-variable "cluster_name" {
-  description = "EKS cluster name to deploy Weaviate to"
-  type        = string
+# Module outputs from dependent modules
+variable "platform_output" {
+  description = "Platform output from airid188503_acc-aws-init-module (contains name, owner, environment_type)"
+  type        = any
   validation {
-    condition     = length(var.cluster_name) > 0
-    error_message = "Cluster name must not be empty."
+    condition     = contains(keys(var.platform_output), "name")
+    error_message = "platform_output must contain name key."
   }
 }
 
-variable "cluster_region" {
-  description = "AWS region where EKS cluster is located"
-  type        = string
-  default     = "us-east-1"
+variable "initialization_output" {
+  description = "Initialization output from airid188503_acc-aws-init-module (contains VPC, subnets, KMS, SSH keys, region)"
+  type        = any
+  validation {
+    condition     = contains(keys(var.initialization_output), "vpc_id") && contains(keys(var.initialization_output), "region")
+    error_message = "initialization_output must contain vpc_id and region keys."
+  }
+}
+
+variable "bastion_host_output" {
+  description = "Bastion host output from airid188503_acc-aws-bastion-host-module (contains IPs, security group, role ARN)"
+  type        = any
+  default     = {}
+}
+
+variable "kubernetes_cluster_output" {
+  description = "EKS cluster output from airid188503_acc-aws-eks-module (contains cluster_name, cluster_endpoint, OIDC info)"
+  type        = any
+  validation {
+    condition     = contains(keys(var.kubernetes_cluster_output), "cluster_name") && contains(keys(var.kubernetes_cluster_output), "aws_iam_openid_connect_provider")
+    error_message = "kubernetes_cluster_output must contain cluster_name and aws_iam_openid_connect_provider keys."
+  }
 }
 
 variable "namespace" {
@@ -53,16 +72,26 @@ variable "storage_size" {
   }
 }
 
+variable "storage_type" {
+  description = "Storage type: 'local' (hostPath - no CSI required), 'emptydir' (ephemeral), or 'persistent' (requires EBS CSI driver)"
+  type        = string
+  default     = "local"
+  validation {
+    condition     = contains(["local", "emptydir", "persistent"], var.storage_type)
+    error_message = "storage_type must be 'local', 'emptydir', or 'persistent'."
+  }
+}
+
 variable "storage_class" {
-  description = "Kubernetes StorageClass for Weaviate PersistentVolume"
+  description = "Kubernetes StorageClass for persistent storage (only used if storage_type='persistent')"
   type        = string
   default     = "gp3"
 }
 
 variable "weaviate_image" {
-  description = "Weaviate Docker image and tag"
+  description = "Weaviate Docker image and tag (should be explicit version, not 'latest')"
   type        = string
-  default     = "semitechnologies/weaviate:latest"
+  default     = "semitechnologies/weaviate:1.25.1"
 }
 
 variable "helm_release_name" {
@@ -72,15 +101,15 @@ variable "helm_release_name" {
 }
 
 variable "helm_repository" {
-  description = "Helm repository URL for Weaviate chart"
+  description = "Helm repository name (must be registered with 'helm repo add weaviate https://weaviate.github.io/weaviate-helm')"
   type        = string
-  default     = "https://weaviate-k8s.github.io/weaviate-helm"
+  default     = "weaviate"
 }
 
 variable "helm_chart_version" {
-  description = "Weaviate Helm chart version"
+  description = "Weaviate Helm chart version (required 17.0.0+ for Weaviate 1.25+)"
   type        = string
-  default     = "16.4.0"
+  default     = "17.7.0"
 }
 
 variable "create_api_key" {
@@ -99,6 +128,12 @@ variable "api_key_recovery_window" {
   }
 }
 
+variable "force_delete_secrets_on_destroy" {
+  description = "Force delete secrets immediately on destroy (true=dev, false=prod with recovery window)"
+  type        = bool
+  default     = true
+}
+
 variable "enable_s3_backups" {
   description = "Enable daily S3 snapshots for Weaviate data backup"
   type        = bool
@@ -115,30 +150,52 @@ variable "backup_retention_days" {
   }
 }
 
-variable "environment" {
-  description = "Environment name (dev, test, staging, prod)"
-  type        = string
-  default     = "dev"
-  validation {
-    condition     = contains(["dev", "test", "staging", "prod"], var.environment)
-    error_message = "Environment must be dev, test, staging, or prod."
-  }
-}
-
-variable "project_name" {
-  description = "Project name for tagging and resource naming"
-  type        = string
-  default     = "myplatform"
-}
-
-variable "tags" {
-  description = "Additional tags to apply to all resources"
-  type        = map(string)
-  default     = {}
-}
-
 variable "helm_values_override" {
   description = "Additional Helm values to override defaults"
   type        = any
   default     = {}
+}
+
+variable "enable_authentication" {
+  description = "Enable API key authentication (required for security in production)"
+  type        = bool
+  default     = true
+}
+
+variable "weaviate_admin_users" {
+  description = "List of admin user emails for authorization"
+  type        = list(string)
+  default     = []
+}
+
+variable "weaviate_readonly_users" {
+  description = "List of read-only user emails for authorization"
+  type        = list(string)
+  default     = []
+}
+
+variable "enable_grpc" {
+  description = "Enable gRPC API access (enabled by default in Helm 17.0.0+)"
+  type        = bool
+  default     = true
+}
+
+variable "grpc_service_type" {
+  description = "Kubernetes service type for gRPC ('LoadBalancer' for external access, 'ClusterIP' for internal)"
+  type        = string
+  default     = "LoadBalancer"
+  validation {
+    condition     = contains(["ClusterIP", "LoadBalancer", "NodePort"], var.grpc_service_type)
+    error_message = "grpc_service_type must be 'ClusterIP', 'LoadBalancer', or 'NodePort'."
+  }
+}
+
+variable "weaviate_run_as_user" {
+  description = "User ID to run Weaviate container as (non-root for security, default 1000)"
+  type        = number
+  default     = 1000
+  validation {
+    condition     = var.weaviate_run_as_user >= 1000 || var.weaviate_run_as_user == 0
+    error_message = "weaviate_run_as_user must be 0 (root - not recommended) or >= 1000 (non-root)."
+  }
 }

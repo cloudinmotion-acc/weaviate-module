@@ -1,16 +1,6 @@
-# EKS Cluster data source
-data "aws_eks_cluster" "this" {
-  name = var.cluster_name
-}
-
-data "aws_eks_cluster_auth" "this" {
-  name = var.cluster_name
-}
-
-# Current AWS account
+# Current AWS account & region
 data "aws_caller_identity" "current" {}
 
-# Current AWS region
 data "aws_region" "current" {}
 
 # KMS key for Secrets Manager encryption
@@ -52,7 +42,7 @@ data "aws_iam_policy_document" "weaviate_secrets" {
       "secretsmanager:DescribeSecret"
     ]
     resources = [
-      "arn:aws:secretsmanager:${var.cluster_region}:${data.aws_caller_identity.current.account_id}:secret:${local.api_key_secret_name}-*"
+      "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:${local.api_key_secret_name}-*"
     ]
   }
 }
