@@ -66,7 +66,7 @@ locals {
   default_helm_values = {
     replicaCount     = var.weaviate_replicas
     scheme           = "http"
-    port             = 8080
+    port             = 7000
     grpc_port        = 50051
     persistence      = local.persistence_config
     

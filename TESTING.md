@@ -11,11 +11,11 @@
 ## Quick Reference: Local vs Cluster Testing
 
 **From LOCAL Machine (outside cluster):**
-- Port-forward before running tests: `kubectl port-forward -n weaviate svc/weaviate-weaviate 8080:8080`
-- Then access: `http://localhost:8080`
+- Port-forward before running tests: `kubectl port-forward -n weaviate svc/weaviate-weaviate 7000:7000`
+- Then access: `http://localhost:7000`
 
 **From CLUSTER (pod inside Kubernetes):**
-- Direct pod-to-pod access via DNS: `http://weaviate-weaviate.weaviate.svc.cluster.local:8080`
+- Direct pod-to-pod access via DNS: `http://weaviate-weaviate.weaviate.svc.cluster.local:7000`
 - Or exec into pod: `kubectl exec -it -n weaviate weaviate-weaviate-0 -- bash`
 
 ## Deployment Verification (Run Immediately After Apply)
@@ -144,7 +144,7 @@ aws secretsmanager describe-secret \
 
 ```bash
 # Terminal 1: Create port-forward (keep running)
-kubectl port-forward -n weaviate svc/weaviate-weaviate 8080:8080 &
+kubectl port-forward -n weaviate svc/weaviate-weaviate 7000:7000 &
 PF_PID=$!
 
 # Wait for port-forward to establish
@@ -155,15 +155,15 @@ sleep 2
 
 ```bash
 # Test 1a: Health endpoint
-curl -X GET http://localhost:8080/v1/.well-known/ready
+curl -X GET http://localhost:7000/v1/.well-known/ready
 # Expected: {"status":"ok"} or {"ready":true}
 
 # Test 1b: Schema endpoint
-curl -X GET http://localhost:8080/v1/schema
+curl -X GET http://localhost:7000/v1/schema
 # Expected: JSON with "classes" array (may be empty initially)
 
 # Test 1c: Liveness probe
-curl -X GET http://localhost:8080/v1/meta
+curl -X GET http://localhost:7000/v1/meta
 # Expected: JSON response with system info
 
 echo "✅ Test 1 PASSED: Weaviate service is healthy"
@@ -191,7 +191,7 @@ Create a test pod to verify internal connectivity:
 ```bash
 # Run debug pod
 kubectl run curl-test --image=curlimages/curl -it --rm --restart=Never -- \
-  curl -X GET http://weaviate-weaviate.weaviate.svc.cluster.local:8080/v1/.well-known/ready
+  curl -X GET http://weaviate-weaviate.weaviate.svc.cluster.local:7000/v1/.well-known/ready
 
 # Expected output: {"status":"ok"} or {"ready":true}
 # Then pod terminates and is cleaned up
@@ -216,7 +216,7 @@ kubectl logs -n weaviate -l app=weaviate --tail=50
 # Expected: Startup logs mentioning:
 # - "Starting Weaviate..."
 # - "Loading modules..."
-# - "REST API available at port 8080"
+# - "REST API available at port 7000"
 # - "gRPC available at port 50051"
 
 # Watch logs in real-time
@@ -238,7 +238,7 @@ echo "✅ Test 3 PASSED: Pod logs accessible and show healthy startup"
 
 ```bash
 # Terminal 1: Port-forward
-kubectl port-forward -n weaviate svc/weaviate-weaviate 8080:8080 &
+kubectl port-forward -n weaviate svc/weaviate-weaviate 7000:7000 &
 PF_PID=$!
 sleep 2
 ```
@@ -247,7 +247,7 @@ sleep 2
 
 ```bash
 # Retrieve current schema
-curl -s -X GET http://localhost:8080/v1/schema | jq '.classes'
+curl -s -X GET http://localhost:7000/v1/schema | jq '.classes'
 
 # Expected: Should contain "Document" class if init job completed successfully:
 # [
@@ -272,7 +272,7 @@ kubectl wait --for=condition=complete job/weaviate-init-schema -n weaviate --tim
 
 ```bash
 # Get Document class details
-curl -s http://localhost:8080/v1/schema/classes/Document | jq '.vectorIndexConfig'
+curl -s http://localhost:7000/v1/schema/classes/Document | jq '.vectorIndexConfig'
 
 # Expected: HNSW configuration:
 # {
@@ -305,7 +305,7 @@ kill $PF_PID 2>/dev/null || true
 ### Setup
 
 ```bash
-kubectl port-forward -n weaviate svc/weaviate-weaviate 8080:8080 &
+kubectl port-forward -n weaviate svc/weaviate-weaviate 7000:7000 &
 PF_PID=$!
 sleep 2
 ```
@@ -314,7 +314,7 @@ sleep 2
 
 ```bash
 # Insert a document with vector
-curl -s -X POST http://localhost:8080/v1/objects \
+curl -s -X POST http://localhost:7000/v1/objects \
   -H "Content-Type: application/json" \
   -d '{
     "class": "Document",
@@ -328,7 +328,7 @@ curl -s -X POST http://localhost:8080/v1/objects \
   }' | jq '.id'
 
 # Expected: UUID of created document (e.g., "e8f00bb8-ab98-4567-aaa1-1234567890ab")
-DOC_ID=$( curl -s -X POST http://localhost:8080/v1/objects \
+DOC_ID=$( curl -s -X POST http://localhost:7000/v1/objects \
   -H "Content-Type: application/json" \
   -d '{
     "class": "Document",
@@ -356,7 +356,7 @@ EOF
 
 # Import via batch endpoint
 cat /tmp/docs.jsonl | while read line; do
-  curl -s -X POST http://localhost:8080/v1/objects \
+  curl -s -X POST http://localhost:7000/v1/objects \
     -H "Content-Type: application/json" \
     -d "$line" > /dev/null
   echo "✓ Inserted document"
@@ -382,7 +382,7 @@ kill $PF_PID 2>/dev/null || true
 ### Setup
 
 ```bash
-kubectl port-forward -n weaviate svc/weaviate-weaviate 8080:8080 &
+kubectl port-forward -n weaviate svc/weaviate-weaviate 7000:7000 &
 PF_PID=$!
 sleep 2
 ```
@@ -391,15 +391,15 @@ sleep 2
 
 ```bash
 # Get all documents in Document class
-curl -s -X GET "http://localhost:8080/v1/objects?class=Document" | jq '.objects | length'
+curl -s -X GET "http://localhost:7000/v1/objects?class=Document" | jq '.objects | length'
 
 # Expected: 4 (or more, depending on previous tests)
 # Sample output: 4
 
 # Get specific document details
-DOC_ID=$(curl -s http://localhost:8080/v1/objects?class=Document | jq -r '.objects[0].id')
+DOC_ID=$(curl -s http://localhost:7000/v1/objects?class=Document | jq -r '.objects[0].id')
 
-curl -s -X GET http://localhost:8080/v1/objects/$DOC_ID | jq '.'
+curl -s -X GET http://localhost:7000/v1/objects/$DOC_ID | jq '.'
 
 # Expected: Full document with metadata:
 # {
@@ -415,7 +415,7 @@ curl -s -X GET http://localhost:8080/v1/objects/$DOC_ID | jq '.'
 # }
 
 # Count total documents
-curl -s http://localhost:8080/v1/objects?class=Document | jq '.objects | length'
+curl -s http://localhost:7000/v1/objects?class=Document | jq '.objects | length'
 
 echo "✅ Test 6 PASSED: Documents retrieved successfully"
 ```
@@ -437,7 +437,7 @@ kill $PF_PID 2>/dev/null || true
 ### Setup
 
 ```bash
-kubectl port-forward -n weaviate svc/weaviate-weaviate 8080:8080 &
+kubectl port-forward -n weaviate svc/weaviate-weaviate 7000:7000 &
 PF_PID=$!
 sleep 2
 ```
@@ -446,7 +446,7 @@ sleep 2
 
 ```bash
 # Search by vector similarity
-curl -s -X POST http://localhost:8080/v1/graphql \
+curl -s -X POST http://localhost:7000/v1/graphql \
   -H "Content-Type: application/json" \
   -d '{
     "query": "{ Get { Document(nearVector: {vector: [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85], certainty: 0.5}, limit: 3) { content source _distance timestamp } } }"
@@ -470,7 +470,7 @@ curl -s -X POST http://localhost:8080/v1/graphql \
 # }
 
 # Alternative: Search with limit on results
-curl -s -X POST http://localhost:8080/v1/graphql \
+curl -s -X POST http://localhost:7000/v1/graphql \
   -H "Content-Type: application/json" \
   -d '{
     "query": "{ Get { Document(limit: 5) { content _distance } } }"
@@ -630,7 +630,7 @@ helm get values weaviate -n weaviate | head -20
 ### Setup
 
 ```bash
-kubectl port-forward -n weaviate svc/weaviate-weaviate 8080:8080 &
+kubectl port-forward -n weaviate svc/weaviate-weaviate 7000:7000 &
 PF_PID=$!
 sleep 2
 ```
@@ -644,7 +644,7 @@ echo "Inserting 100 documents with vectors..."
 time (
   for i in {1..100}; do
     VECTOR=$(python3 -c "import random; print([random.random() for _ in range(8)])" | tr -d '[]')
-    curl -s -X POST http://localhost:8080/v1/objects \
+    curl -s -X POST http://localhost:7000/v1/objects \
       -H "Content-Type: application/json" \
       -d "{
         \"class\": \"Document\",
@@ -674,7 +674,7 @@ echo "Running 10 similarity searches..."
 
 time (
   for i in {1..10}; do
-    curl -s -X POST http://localhost:8080/v1/graphql \
+    curl -s -X POST http://localhost:7000/v1/graphql \
       -H "Content-Type: application/json" \
       -d '{
         "query": "{ Get { Document(nearVector: {vector: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]}, limit: 10) { content _distance } } }"
@@ -690,7 +690,7 @@ time (
 
 ```bash
 # Get total document count
-TOTAL=$(curl -s http://localhost:8080/v1/objects?class=Document | jq '.totalResults')
+TOTAL=$(curl -s http://localhost:7000/v1/objects?class=Document | jq '.totalResults')
 echo "Total documents: $TOTAL"
 
 # Expected: 100+ (from previous inserts)
@@ -715,15 +715,15 @@ echo "✅ Test 11 PASSED: Performance baseline established"
 
 ```bash
 # Port-forward
-kubectl port-forward -n weaviate svc/weaviate-weaviate 8080:8080 &
+kubectl port-forward -n weaviate svc/weaviate-weaviate 7000:7000 &
 PF_PID=$!
 sleep 2
 
 # Delete Document class (this deletes all documents)
-curl -X DELETE http://localhost:8080/v1/schema/classes/Document
+curl -X DELETE http://localhost:7000/v1/schema/classes/Document
 
 # Verify deletion
-curl -s http://localhost:8080/v1/schema | jq '.classes'
+curl -s http://localhost:7000/v1/schema | jq '.classes'
 
 # Expected: Empty array [] or no Document class
 
@@ -740,9 +740,9 @@ kubectl apply -f weaviate-init.yaml
 kubectl wait --for=condition=complete job/weaviate-init-schema -n weaviate --timeout=60s
 
 # Verify
-kubectl port-forward -n weaviate svc/weaviate-weaviate 8080:8080 &
+kubectl port-forward -n weaviate svc/weaviate-weaviate 7000:7000 &
 sleep 2
-curl -s http://localhost:8080/v1/schema | jq '.classes[0].class'
+curl -s http://localhost:7000/v1/schema | jq '.classes[0].class'
 # Expected: "Document"
 kill %1 2>/dev/null || true
 ```
@@ -916,7 +916,7 @@ kubectl get endpoints -n weaviate weaviate-weaviate
 
 # Test internal connectivity
 kubectl run -it --rm --image=curlimages/curl -- \
-  curl http://weaviate-weaviate.weaviate.svc.cluster.local:8080/v1/.well-known/ready
+  curl http://weaviate-weaviate.weaviate.svc.cluster.local:7000/v1/.well-known/ready
 ```
 
 ### S3 Backup Access Issues
@@ -950,7 +950,3 @@ aws secretsmanager get-secret-value \
 - [AWS EKS Documentation](https://docs.aws.amazon.com/eks/)
 
 ---
-
-**Last Updated**: March 2025  
-**Module Version**: 1.0.0  
-**Maintenance**: terraform-aws-weaviate-eks

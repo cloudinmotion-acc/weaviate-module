@@ -99,10 +99,16 @@ variable "helm_release_name" {
   default     = "weaviate"
 }
 
-variable "helm_repository" {
-  description = "Helm repository name (must be registered with 'helm repo add weaviate https://weaviate.github.io/weaviate-helm')"
+variable "helm_repository_name" {
+  description = "Helm repository name for Weaviate (Terraform will register if not present)"
   type        = string
   default     = "weaviate"
+}
+
+variable "helm_repository_url" {
+  description = "Helm repository URL for Weaviate charts"
+  type        = string
+  default     = "https://weaviate.github.io/weaviate-helm"
 }
 
 variable "helm_chart_version" {
@@ -164,7 +170,7 @@ variable "enable_authentication" {
 variable "weaviate_admin_users" {
   description = "List of admin user emails for authorization"
   type        = list(string)
-  default     = []
+  default     = ["admin123@accenture.com"]
 }
 
 variable "weaviate_readonly_users" {

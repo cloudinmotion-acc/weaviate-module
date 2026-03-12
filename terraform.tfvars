@@ -57,8 +57,8 @@ backup_retention_days   = 7
 enable_authentication   = true
 vector_dimensions       = 1536 # default=1536 Vector embedding dimensions (OpenAI: 1536, smaller models: 384, 1024) [128, 256, 384, 512, 768, 1024, 1536, 3072]
 storage_size            = "50Gi" # default=50Gi format:50Gi - minimum storage size for Weaviate data 
-weaviate_admin_users    = ["akshaya.durgapu@accenture.com"] # List of admin users for Weaviate authentication
-weaviate_readonly_users = [] # default=[], List of read-only users for Weaviate authentication
+# weaviate_admin_users    = ["akshaya.durgapu@accenture.com"] # List of admin users for Weaviate authentication
+# weaviate_readonly_users = [] # default=[], List of read-only users for Weaviate authentication
 
 
 enable_grpc             = true

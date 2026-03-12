@@ -1,3 +1,22 @@
+provider "kubernetes" {
+  host                   = local.cluster_endpoint
+  cluster_ca_certificate = base64decode(local.cluster_ca_cert)
+  token                  = data.aws_eks_cluster_auth.weaviate.token
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = local.cluster_endpoint
+    cluster_ca_certificate = base64decode(local.cluster_ca_cert)
+    token                  = data.aws_eks_cluster_auth.weaviate.token
+  }
+}
+
+# Get Kubernetes auth token for the EKS cluster
+data "aws_eks_cluster_auth" "weaviate" {
+  name = local.cluster_name
+}
+
 # Explicit dependency on all upstream modules
 # This ensures weaviate module waits for INFRASTRUCTURE, EKS, and bastion modules to complete
 resource "null_resource" "module_depends_on" {
@@ -159,10 +178,20 @@ resource "aws_secretsmanager_secret_version" "weaviate_api_key" {
   })
 }
 
+# Register Weaviate Helm repository using local-exec
+resource "null_resource" "helm_repo_add" {
+  provisioner "local-exec" {
+    command = "helm repo add ${var.helm_repository_name} ${var.helm_repository_url} --force-update && helm repo update"
+    on_failure = continue
+  }
+
+  depends_on = [kubernetes_namespace_v1.weaviate]
+}
+
 # Helm release for Weaviate
 resource "helm_release" "weaviate" {
   name             = var.helm_release_name
-  repository       = var.helm_repository
+  repository       = var.helm_repository_name
   chart            = "weaviate"
   version          = var.helm_chart_version
   namespace        = kubernetes_namespace_v1.weaviate.metadata[0].name
@@ -187,6 +216,7 @@ resource "helm_release" "weaviate" {
   ]
 
   depends_on = [
+    null_resource.helm_repo_add,
     kubernetes_service_account_v1.weaviate,
     aws_iam_role_policy.weaviate_s3_backups,
     aws_iam_role_policy.weaviate_secrets,

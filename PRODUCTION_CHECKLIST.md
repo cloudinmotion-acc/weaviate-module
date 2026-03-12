@@ -135,13 +135,13 @@ kubectl get pods -n weaviate -w
 kubectl logs -n weaviate -l app.kubernetes.io/name=weaviate
 
 # Port forward to test REST API
-kubectl port-forward -n weaviate svc/weaviate 8080:8080
+kubectl port-forward -n weaviate svc/weaviate 7000:7000
 
 # Port forward to test gRPC API
 kubectl port-forward -n weaviate svc/weaviate 50051:50051
 
 # In another terminal, test endpoint
-curl -X GET http://localhost:8080/v1/meta
+curl -X GET http://localhost:7000/v1/meta
 ```
 
 ## ✅ Post-Deployment Verification
@@ -209,7 +209,7 @@ If upgrading from Weaviate < 1.25:
 
 ### Health Endpoint
 ```bash
-curl -X GET http://weaviate.weaviate.svc.cluster.local:8080/v1/meta
+curl -X GET http://weaviate.weaviate.svc.cluster.local:7000/v1/meta
 ```
 
 ### Pod Status

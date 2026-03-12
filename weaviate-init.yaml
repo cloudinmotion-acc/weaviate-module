@@ -63,7 +63,7 @@ spec:
         - name: WEAVIATE_HOST
           value: "weaviate-weaviate.weaviate.svc.cluster.local"
         - name: WEAVIATE_PORT
-          value: "8080"
+          value: "7000"
         command:
         - /bin/sh
         - -c
