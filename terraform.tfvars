@@ -45,7 +45,7 @@ namespace               = "weaviate"
 weaviate_replicas       = 3
 vector_dimensions       = 1536
 storage_size            = "50Gi"
-storage_type            = "emptydir"  # Use ephemeral storage to work around EKS networking issue
+storage_type            = "persistent"  # Use ephemeral storage to work around EKS networking issue
 storage_class           = "gp3"
 weaviate_image          = "semitechnologies/weaviate:1.25.1"
 helm_release_name       = "weaviate"
@@ -64,5 +64,5 @@ weaviate_readonly_users = []
 enable_grpc             = true
 grpc_service_type       = "LoadBalancer"
 
-# Security - run as non-root user
-weaviate_run_as_user    = 1000
+# Security - run as root (Weaviate default) - init runs as root for setup anyway
+weaviate_run_as_user    = 0

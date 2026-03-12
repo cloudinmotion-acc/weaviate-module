@@ -193,12 +193,15 @@ resource "helm_release" "weaviate" {
     aws_iam_role_policy.weaviate_kms
   ]
 
-  wait = true
+  wait = false
 
   lifecycle {
     ignore_changes = [values]
   }
 }
+
+# Helm chart creates all services (weaviate REST API, weaviate-grpc, weaviate-headless)
+# No need to create them separately - chart version 17.7.0 handles this automatically
 
 # Destroy provisioner to clean up on destroy
 resource "null_resource" "helm_cleanup" {

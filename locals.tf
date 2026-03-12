@@ -70,7 +70,8 @@ locals {
     grpc_port        = 50051
     persistence      = local.persistence_config
     
-    # Security context - run as non-root user
+    # Security context - note: init container runs as root to configure node
+    # Main container runs as specified user (default root for Weaviate)
     containerSecurityContext = {
       runAsUser       = var.weaviate_run_as_user
       runAsNonRoot    = var.weaviate_run_as_user != 0
@@ -96,22 +97,35 @@ locals {
       type    = var.grpc_service_type
     }
     
-    # Authentication - API key enabled
+    # Authentication - API key enabled with users configuration
     authentication = var.enable_authentication ? {
       apikey = {
         enabled = true
+        allowed_keys = var.create_api_key ? [random_password.weaviate_api_key[0].result] : []
+        users = concat(
+          var.weaviate_admin_users,
+          var.weaviate_readonly_users
+        )
       }
-    } : {}
+      anonymous_access = {
+        enabled = false
+      }
+    } : {
+      apikey = {
+        enabled = false
+        allowed_keys = []
+        users = []
+      }
+      anonymous_access = {
+        enabled = true
+      }
+    }
     
-    # Authorization - admin and readonly users
-    authorization = length(var.weaviate_admin_users) > 0 || length(var.weaviate_readonly_users) > 0 ? {
+    # Authorization - admin and readonly user mapping
+    authorization = var.enable_authentication && length(concat(var.weaviate_admin_users, var.weaviate_readonly_users)) > 0 ? {
       admin_list = {
         enabled = length(var.weaviate_admin_users) > 0
         users   = var.weaviate_admin_users
-      }
-      readonly = {
-        enabled = length(var.weaviate_readonly_users) > 0
-        users   = var.weaviate_readonly_users
       }
     } : {}
     
