@@ -1,4 +1,3 @@
-# Module outputs from dependent modules
 variable "platform_output" {
   description = "Platform output from airid188503_acc-aws-init-module (contains name, owner, environment_type)"
   type        = any
@@ -75,7 +74,7 @@ variable "storage_size" {
 variable "storage_type" {
   description = "Storage type: 'local' (hostPath - no CSI required), 'emptydir' (ephemeral), or 'persistent' (requires EBS CSI driver)"
   type        = string
-  default     = "local"
+  default     = "persistent"
   validation {
     condition     = contains(["local", "emptydir", "persistent"], var.storage_type)
     error_message = "storage_type must be 'local', 'emptydir', or 'persistent'."
@@ -183,7 +182,7 @@ variable "enable_grpc" {
 variable "grpc_service_type" {
   description = "Kubernetes service type for gRPC ('LoadBalancer' for external access, 'ClusterIP' for internal)"
   type        = string
-  default     = "LoadBalancer"
+  default     = "ClusterIP"
   validation {
     condition     = contains(["ClusterIP", "LoadBalancer", "NodePort"], var.grpc_service_type)
     error_message = "grpc_service_type must be 'ClusterIP', 'LoadBalancer', or 'NodePort'."
@@ -193,7 +192,7 @@ variable "grpc_service_type" {
 variable "weaviate_run_as_user" {
   description = "User ID to run Weaviate container as (non-root for security, default 1000)"
   type        = number
-  default     = 1000
+  default     = 0
   validation {
     condition     = var.weaviate_run_as_user >= 1000 || var.weaviate_run_as_user == 0
     error_message = "weaviate_run_as_user must be 0 (root - not recommended) or >= 1000 (non-root)."

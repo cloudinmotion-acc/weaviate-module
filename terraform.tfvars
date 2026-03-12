@@ -43,9 +43,7 @@ kubernetes_cluster_output = {
 
 namespace               = "weaviate"
 weaviate_replicas       = 3
-vector_dimensions       = 1536
-storage_size            = "50Gi"
-storage_type            = "persistent"  # Use ephemeral storage to work around EKS networking issue
+storage_type            = "persistent"
 storage_class           = "gp3"
 weaviate_image          = "semitechnologies/weaviate:1.25.1"
 helm_release_name       = "weaviate"
@@ -55,14 +53,15 @@ force_delete_secrets_on_destroy = true
 enable_s3_backups       = true
 backup_retention_days   = 7
 
-# Authentication and Authorization
-enable_authentication   = true
-weaviate_admin_users    = ["akshaya.durgapu@accenture.com"]
-weaviate_readonly_users = []
 
-# gRPC configuration
+enable_authentication   = true
+vector_dimensions       = 1536 # default=1536 Vector embedding dimensions (OpenAI: 1536, smaller models: 384, 1024) [128, 256, 384, 512, 768, 1024, 1536, 3072]
+storage_size            = "50Gi" # default=50Gi format:50Gi - minimum storage size for Weaviate data 
+weaviate_admin_users    = ["akshaya.durgapu@accenture.com"] # List of admin users for Weaviate authentication
+weaviate_readonly_users = [] # default=[], List of read-only users for Weaviate authentication
+
+
 enable_grpc             = true
 grpc_service_type       = "LoadBalancer"
 
-# Security - run as root (Weaviate default) - init runs as root for setup anyway
 weaviate_run_as_user    = 0
