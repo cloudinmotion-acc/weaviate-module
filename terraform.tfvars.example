@@ -21,6 +21,7 @@ initialization_output = {
   ssh_key_name        = "your-key-pair"
   db_subnet_group     = "your-db-subnet-group"
   dns_private_zone_id = "zone-id"
+  ...
 }
 
 bastion_host_output = {
@@ -31,6 +32,7 @@ bastion_host_output = {
   security_group_id = "sg-xxxxx"
   role_arn          = "arn:aws:iam::account-id:role/bastion-role"
   role_name         = "bastion-role"
+  ...
 }
 
 kubernetes_cluster_output = {
@@ -42,13 +44,12 @@ kubernetes_cluster_output = {
   cluster_iam_role_arn            = "arn:aws:iam::account-id:role/eks-cluster-role"
   aws_iam_openid_connect_provider = "arn:aws:iam::account-id:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/xxxxx"
   aws_iam_openid_url              = "https://oidc.eks.us-east-1.amazonaws.com/id/xxxxx"
+  ...
 }
 
 namespace               = "weaviate"
 weaviate_replicas       = 3
-vector_dimensions       = 1536
-storage_size            = "50Gi"
-storage_type            = "local"
+storage_type            = "persistent"
 storage_class           = "gp3"
 weaviate_image          = "semitechnologies/weaviate:1.25.1"
 helm_release_name       = "weaviate"
@@ -58,8 +59,15 @@ force_delete_secrets_on_destroy = true
 enable_s3_backups       = true
 backup_retention_days   = 7
 
-tags = {
-  Owner       = "your-team"
-  CostCenter  = "your-cost-center"
-  Application = "weaviate-vector-search"
-}
+
+enable_authentication   = true
+vector_dimensions       = 1536 # default=1536 Vector embedding dimensions (OpenAI: 1536, smaller models: 384, 1024) [128, 256, 384, 512, 768, 1024, 1536, 3072]
+storage_size            = "50Gi" # default=50Gi format:50Gi - minimum storage size for Weaviate data 
+weaviate_admin_users    = ["admin@accenture.com"] # List of admin users for Weaviate authentication
+weaviate_readonly_users = [] # default=[], List of read-only users for Weaviate authentication
+
+
+enable_grpc             = true
+grpc_service_type       = "ClusterIp"
+
+weaviate_run_as_user    = 0
